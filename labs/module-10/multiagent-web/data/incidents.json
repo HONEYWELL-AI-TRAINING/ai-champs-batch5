@@ -1,0 +1,122 @@
+[
+  {
+    "id": "INC-104233",
+    "summary": "VPN error 809 after laptop sleep",
+    "description": "Since this morning the VPN client shows error 809 whenever my laptop wakes up. I am working from home on Wi-Fi.",
+    "category": "network",
+    "priority": "P3",
+    "region": "EU",
+    "team": "Network Ops",
+    "reporter_role": "employee",
+    "expected_kb": "KB-0042",
+    "status": "open"
+  },
+  {
+    "id": "INC-104240",
+    "summary": "Lost phone with authenticator app",
+    "description": "I lost my phone on the train. I cannot sign in because the authenticator app was on it.",
+    "category": "identity",
+    "priority": "P3",
+    "region": "APAC",
+    "team": "Service Desk",
+    "reporter_role": "employee",
+    "expected_kb": "KB-0057",
+    "status": "open"
+  },
+  {
+    "id": "INC-104251",
+    "summary": "Build agent disk at 95 percent",
+    "description": "Build agent bld-eu-12 reports 95 percent disk usage and pipeline jobs fail with no space left on device.",
+    "category": "infrastructure",
+    "priority": "P2",
+    "region": "EU",
+    "team": "Platform Engineering",
+    "reporter_role": "l2_engineer",
+    "expected_kb": "KB-0063",
+    "status": "open"
+  },
+  {
+    "id": "INC-104260",
+    "summary": "Internal DNS not resolving in EU",
+    "description": "Internal names under the corporate zone stopped resolving for all EU users about ten minutes ago.",
+    "category": "network",
+    "priority": "P1",
+    "region": "EU",
+    "team": "Network Ops",
+    "reporter_role": "team_lead",
+    "expected_kb": "KB-0071",
+    "status": "open"
+  },
+  {
+    "id": "INC-104268",
+    "summary": "TLS certificate expired on payments gateway",
+    "description": "Customers see a browser warning on the payments gateway: the certificate expired at midnight.",
+    "category": "infrastructure",
+    "priority": "P1",
+    "region": "US",
+    "team": "Platform Engineering",
+    "reporter_role": "team_lead",
+    "expected_kb": "KB-0078",
+    "status": "open"
+  },
+  {
+    "id": "INC-104275",
+    "summary": "Forgot password",
+    "description": "I forgot my password and the reset link did not arrive.",
+    "category": "identity",
+    "priority": "P4",
+    "region": "US",
+    "team": "Service Desk",
+    "reporter_role": "employee",
+    "expected_kb": "KB-0084",
+    "status": "open"
+  },
+  {
+    "id": "INC-104281",
+    "summary": "Kubernetes node NotReady",
+    "description": "Worker node worker-us-03 is NotReady and several pods are pending.",
+    "category": "infrastructure",
+    "priority": "P2",
+    "region": "US",
+    "team": "Platform Engineering",
+    "reporter_role": "l2_engineer",
+    "expected_kb": "KB-0091",
+    "status": "open"
+  },
+  {
+    "id": "INC-104290",
+    "summary": "Orders service connection pool exhausted",
+    "description": "The orders service times out under load and the logs say pool exhausted.",
+    "category": "application",
+    "priority": "P1",
+    "region": "EU",
+    "team": "Platform Engineering",
+    "reporter_role": "l2_engineer",
+    "expected_kb": "KB-0097",
+    "status": "open"
+  },
+  {
+    "id": "INC-104297",
+    "summary": "Printer queue stuck on floor 3",
+    "description": "Nothing prints on floor 3 and the queue shows twelve waiting jobs.",
+    "category": "workplace",
+    "priority": "P4",
+    "region": "APAC",
+    "team": "Service Desk",
+    "reporter_role": "employee",
+    "expected_kb": "KB-0103",
+    "status": "open"
+  },
+  {
+    "id": "INC-104301",
+    "summary": "Access to finance shared mailbox",
+    "description": "Please give me access to the finance shared mailbox. I joined the team on Monday.",
+    "category": "identity",
+    "priority": "P4",
+    "region": "EU",
+    "team": "Service Desk",
+    "reporter_role": "employee",
+    "expected_kb": "KB-0110",
+    "status": "open"
+  }
+]

@@ -1,0 +1,1299 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Module 4 — Multi-Agent Workflow Canvas</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%2714%27 fill=%27%230f172a%27 stroke=%27%2322d3ee%27 stroke-width=%273%27/%3E%3Ccircle cx=%2710%27 cy=%2716%27 r=%273%27 fill=%27%2334d399%27/%3E%3Ccircle cx=%2722%27 cy=%2710%27 r=%273%27 fill=%27%2322d3ee%27/%3E%3Ccircle cx=%2722%27 cy=%2722%27 r=%273%27 fill=%27%23f59e0b%27/%3E%3C/svg%3E" />
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      :root {
+        --bg: #0f172a; --panel: #1e293b; --line: #334155; --text: #e2e8f0; --muted: #94a3b8; --dim: #64748b;
+        --accent: #06b6d4; --accent-2: #22d3ee; --agent: #06b6d4; --router: #f59e0b;
+        --ok: #34d399; --bad: #f87171; --warn: #fbbf24; --start: #34d399; --end: #a78bfa;
+      }
+      html, body { height: 100%; }
+      body {
+        font-family: "Segoe UI", system-ui, sans-serif; background: var(--bg); color: var(--text);
+        display: flex; flex-direction: column; overflow: hidden;
+      }
+      button, input, select, textarea { font-family: inherit; }
+
+      /* ── Top bar ── */
+      .topbar {
+        background: var(--panel); border-bottom: 1px solid var(--line); padding: 9px 16px;
+        display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+      }
+      .brand { font-size: 1.02rem; font-weight: 700; color: var(--accent-2); display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+      .brand-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--ok); animation: pulse 1.6s infinite ease-in-out; }
+      @keyframes pulse { 50% { opacity: 0.4; transform: scale(0.8); } }
+      .chip { font-size: 0.72rem; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; font-family: Consolas, monospace; }
+      .chip:empty { display: none; }
+      .spacer { flex: 1; }
+      .btn {
+        padding: 6px 12px; border-radius: 7px; border: 1px solid var(--line); background: var(--bg); color: var(--muted);
+        cursor: pointer; font-size: 0.78rem; font-weight: 600; transition: all 0.15s; white-space: nowrap;
+      }
+      .btn:hover:not(:disabled) { border-color: var(--accent); color: var(--text); }
+      .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+      .btn.primary { background: var(--accent); border-color: var(--accent); color: #0f172a; }
+      .btn.primary:hover:not(:disabled) { background: var(--accent-2); border-color: var(--accent-2); color: #0f172a; }
+      .btn.stop { background: #ef4444; border-color: #ef4444; color: #fff; }
+      .btn.danger:hover:not(:disabled) { border-color: var(--bad); color: var(--bad); }
+      select, input[type="text"], input[type="number"], textarea {
+        background: var(--bg); border: 1px solid var(--line); border-radius: 7px; color: var(--text);
+        padding: 6px 9px; font-size: 0.82rem; width: 100%;
+      }
+      select:focus, input:focus, textarea:focus { border-color: var(--accent); outline: none; }
+      .topbar select { width: auto; }
+      textarea { resize: vertical; line-height: 1.45; }
+
+      /* ── Task bar ── */
+      .taskbar { display: flex; gap: 10px; align-items: flex-start; padding: 10px 16px; background: #131c31; border-bottom: 1px solid var(--line); }
+      .taskbar label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--dim); padding-top: 9px; }
+      .taskbar textarea { flex: 1; min-height: 38px; max-height: 110px; resize: vertical; }
+      .taskbar .btn { padding: 9px 18px; font-size: 0.85rem; }
+
+      /* ── Workspace ── */
+      .workspace { flex: 1; display: grid; grid-template-columns: 1fr 330px; min-height: 0; }
+      .canvas-col { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+      .canvas-tools { position: absolute; z-index: 5; top: 10px; left: 12px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; right: 12px; pointer-events: none; }
+      .canvas-tools > * { pointer-events: auto; }
+      .canvas-tools .hint { font-size: 0.7rem; color: var(--dim); }
+      .canvas-wrap {
+        flex: 1; overflow: auto; position: relative; min-height: 0;
+        background-color: var(--bg);
+        background-image: radial-gradient(#243249 1px, transparent 1px); background-size: 22px 22px;
+      }
+      #sizer { position: relative; margin-top: 46px; }
+      #canvas { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+      #edges { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+      #nodes { position: absolute; inset: 0; }
+      .locked .node { cursor: default; }
+
+      .right-col { background: var(--panel); border-left: 1px solid var(--line); padding: 14px; overflow-y: auto; min-height: 0; }
+      .right-col h3 {
+        font-size: 0.68rem; color: var(--dim); text-transform: uppercase; letter-spacing: 0.08em;
+        margin: 16px 0 7px; display: flex; justify-content: space-between; align-items: center;
+      }
+      .right-col h3:first-child { margin-top: 0; }
+      .field { margin-bottom: 10px; }
+      .field > label { display: block; font-size: 0.7rem; color: var(--muted); margin-bottom: 4px; }
+      .field .note { font-size: 0.66rem; color: var(--dim); margin-top: 3px; line-height: 1.4; }
+      .row { display: flex; gap: 8px; }
+      .row > * { flex: 1; min-width: 0; }
+      .seg { display: flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+      .seg button { flex: 1; background: var(--bg); border: none; color: var(--muted); padding: 6px; font-size: 0.76rem; font-weight: 600; cursor: pointer; }
+      .seg button.on { background: rgba(6, 182, 212, 0.18); color: var(--accent-2); }
+      .seg button.on.router { background: rgba(245, 158, 11, 0.18); color: var(--router); }
+      .tool { display: flex; align-items: flex-start; gap: 7px; font-size: 0.76rem; color: var(--muted); margin-bottom: 5px; line-height: 1.35; }
+      .tool input { margin-top: 3px; }
+      .tool code { color: var(--accent-2); font-size: 0.74rem; }
+      .checks { border: 1px solid var(--line); border-radius: 9px; padding: 9px 11px; background: var(--bg); font-size: 0.76rem; line-height: 1.45; }
+      .checks.ok { border-color: rgba(52, 211, 153, 0.4); color: #6ee7b7; }
+      .checks.bad { border-color: rgba(248, 113, 113, 0.45); }
+      .checks ul { padding-left: 16px; }
+      .checks .e { color: #fca5a5; margin-bottom: 3px; }
+      .checks .w { color: var(--warn); margin-bottom: 3px; }
+      .checks .j { color: var(--muted); margin-top: 4px; }
+      .help { font-size: 0.74rem; color: var(--muted); line-height: 1.55; }
+      .help li { margin-left: 16px; margin-bottom: 4px; }
+      .help kbd { background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; font-size: 0.68rem; }
+
+      /* ── Nodes on the canvas ── */
+      .node {
+        position: absolute; width: 230px; background: var(--panel); border: 1.5px solid var(--line); border-radius: 11px;
+        cursor: grab; user-select: none; z-index: 1; transition: box-shadow 0.2s, border-color 0.2s, opacity 0.3s;
+      }
+      .node.selected { border-color: var(--accent-2); box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.25); }
+      .node.router.selected { border-color: var(--router); box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.25); }
+      .node.drop-ok { border-color: var(--ok); box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.3); }
+      .node-head { display: flex; align-items: center; gap: 7px; padding: 9px 12px 4px; }
+      .node-ico { font-size: 0.95rem; }
+      .node-name { font-size: 0.85rem; font-weight: 700; color: #f1f5f9; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+      .node-kind { font-size: 0.58rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; border-radius: 99px; padding: 1px 7px; }
+      .node.agent .node-kind { color: var(--agent); background: rgba(6, 182, 212, 0.12); border: 1px solid rgba(6, 182, 212, 0.4); }
+      .node.router .node-kind { color: var(--router); background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.4); }
+      .node.router { border-top: 3px solid var(--router); }
+      .node.agent { border-top: 3px solid var(--agent); }
+      .node-sub { padding: 0 12px 4px; font-size: 0.66rem; color: var(--dim); font-family: Consolas, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .node-tools { padding: 0 12px 4px; display: flex; gap: 4px; flex-wrap: wrap; }
+      .node-tools span { font-size: 0.6rem; color: #5eead4; background: rgba(20, 184, 166, 0.1); border: 1px solid rgba(20, 184, 166, 0.3); border-radius: 99px; padding: 0 6px; }
+      .node-role { padding: 0 12px 6px; font-size: 0.68rem; color: var(--muted); line-height: 1.35; max-height: 2.8em; overflow: hidden; }
+      .node-status { padding: 5px 12px 7px; font-size: 0.68rem; color: var(--dim); border-top: 1px solid var(--line); min-height: 26px; display: flex; align-items: center; gap: 6px; }
+      .node.terminal { width: 96px; border-radius: 28px; text-align: center; border-top-width: 1.5px; }
+      .node.terminal .node-head { justify-content: center; padding: 13px 8px; }
+      .node.terminal .node-name { flex: none; }
+      .node.t-start { border-color: rgba(52, 211, 153, 0.6); }
+      .node.t-end { border-color: rgba(167, 139, 250, 0.6); }
+      .port {
+        position: absolute; top: 50%; width: 15px; height: 15px; margin-top: -8px; border-radius: 50%;
+        background: var(--bg); border: 2px solid var(--dim); z-index: 3; transition: all 0.12s;
+      }
+      .port.in { left: -8px; } .port.out { right: -8px; cursor: crosshair; }
+      .port.out:hover { border-color: var(--accent-2); background: var(--accent-2); transform: scale(1.25); }
+      .locked .port.out { cursor: default; }
+      .node.running { border-color: var(--accent-2); box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.22), 0 0 22px rgba(34, 211, 238, 0.25); }
+      .node.running .node-status { color: var(--accent-2); }
+      .node.done { border-color: rgba(52, 211, 153, 0.7); }
+      .node.done .node-status { color: var(--ok); }
+      .node.error { border-color: var(--bad); box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.25); }
+      .node.error .node-status { color: var(--bad); }
+      .node.skipped { opacity: 0.45; }
+      .node.stopped { border-color: var(--warn); opacity: 0.8; }
+      .node.stopped .node-status { color: var(--warn); }
+      .spin { width: 10px; height: 10px; border: 2px solid rgba(34, 211, 238, 0.3); border-top-color: var(--accent-2); border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+
+      /* ── Edges ── */
+      .edge .line { fill: none; stroke: #475569; stroke-width: 2; marker-end: url(#arrow-idle); }
+      .edge .hit { fill: none; stroke: transparent; stroke-width: 16; pointer-events: stroke; cursor: pointer; }
+      .edge.router .line { stroke: #8a6a2a; stroke-dasharray: 6 4; marker-end: url(#arrow-router); }
+      .edge:hover .line { stroke: var(--muted); }
+      .edge.selected .line { stroke: var(--accent-2); stroke-width: 2.6; marker-end: url(#arrow-live); }
+      .edge.flow .line { stroke: var(--accent-2); stroke-width: 2.6; stroke-dasharray: 8 6; animation: dash 0.6s linear infinite; marker-end: url(#arrow-live); }
+      .edge.done .line { stroke: var(--ok); stroke-width: 2.4; stroke-dasharray: none; marker-end: url(#arrow-done); }
+      @keyframes dash { to { stroke-dashoffset: -14; } }
+      .edge .elabel { font-size: 10.5px; fill: #c8a45b; paint-order: stroke; stroke: var(--bg); stroke-width: 4px; text-anchor: middle; pointer-events: none; }
+      #tempLink { fill: none; stroke: var(--accent-2); stroke-width: 2; stroke-dasharray: 5 4; }
+
+      /* ── Console ── */
+      .splitter { height: 7px; background: var(--line); cursor: row-resize; flex-shrink: 0; position: relative; }
+      .splitter::after { content: ""; position: absolute; left: 50%; top: 2px; width: 44px; height: 3px; margin-left: -22px; border-radius: 3px; background: #475569; }
+      .splitter:hover { background: var(--accent); }
+      .console { height: 34vh; min-height: 140px; border-top: 1px solid var(--line); background: #131c31; display: flex; flex-direction: column; }
+      .tabs { display: flex; gap: 2px; padding: 6px 12px 0; border-bottom: 1px solid var(--line); align-items: flex-end; }
+      .tab { background: transparent; border: none; color: var(--dim); padding: 7px 14px; font-size: 0.8rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent; }
+      .tab:hover { color: var(--text); }
+      .tab.on { color: var(--accent-2); border-bottom-color: var(--accent-2); }
+      .tab .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); margin-left: 5px; }
+      .tabs .grow { flex: 1; }
+      .pane { flex: 1; overflow-y: auto; padding: 12px 16px; min-height: 0; display: none; }
+      .pane.on { display: block; }
+
+      .phead { position: sticky; top: -12px; z-index: 3; background: #131c31; margin: -12px -16px 10px; padding: 12px 16px 2px; border-bottom: 1px solid transparent; }
+      .progress { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; flex-wrap: wrap; }
+      .bar { flex: 1; min-width: 160px; height: 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 99px; overflow: hidden; }
+      .bar > div { height: 100%; width: 0%; background: var(--accent); transition: width 0.4s; }
+      .bar.done > div { background: var(--ok); }
+      .bar.bad > div { background: var(--bad); }
+      .plabel { font-size: 0.78rem; color: var(--muted); font-family: Consolas, monospace; white-space: nowrap; }
+      .trail { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 12px; }
+      .trail span { font-size: 0.68rem; border-radius: 99px; padding: 2px 9px; border: 1px solid var(--line); color: var(--muted); }
+      .trail span.running { color: var(--accent-2); border-color: var(--accent-2); animation: pulse 1.2s infinite; }
+      .trail span.done { color: var(--ok); border-color: rgba(52, 211, 153, 0.5); }
+      .trail span.error { color: var(--bad); border-color: var(--bad); }
+      .trail span.stopped { color: var(--warn); border-color: rgba(251, 191, 36, 0.5); }
+      .step { background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--agent); border-radius: 9px; padding: 9px 12px; margin-bottom: 9px; }
+      .step.router { border-left-color: var(--router); }
+      .step.running { border-color: rgba(34, 211, 238, 0.5); border-left-color: var(--accent-2); }
+      .step.error { border-color: var(--bad); }
+      .step-head { display: flex; gap: 9px; align-items: center; flex-wrap: wrap; font-size: 0.8rem; }
+      .step-head b { color: #f1f5f9; }
+      .step-head .no { color: var(--dim); font-family: Consolas, monospace; font-size: 0.72rem; }
+      .step-head .meta { margin-left: auto; color: var(--dim); font-family: Consolas, monospace; font-size: 0.7rem; }
+      .step-head .mdl { color: var(--dim); font-size: 0.7rem; font-family: Consolas, monospace; }
+      .step-body { margin-top: 6px; font-size: 0.84rem; line-height: 1.55; color: #cbd5e1; white-space: pre-wrap; word-break: break-word; }
+      .step-body:empty { display: none; }
+      .cursor { display: inline-block; width: 6px; height: 13px; background: var(--accent-2); vertical-align: text-bottom; animation: blink 0.8s infinite; margin-left: 2px; }
+      @keyframes blink { 50% { opacity: 0; } }
+      .waiting { color: var(--dim); font-size: 0.78rem; display: flex; align-items: center; gap: 8px; }
+      .tool-row { margin-top: 6px; font-size: 0.74rem; border: 1px dashed rgba(20, 184, 166, 0.4); border-radius: 7px; padding: 6px 9px; color: #5eead4; font-family: Consolas, monospace; white-space: pre-wrap; word-break: break-word; }
+      .tool-row .res { color: var(--muted); margin-top: 3px; max-height: 5.2em; overflow: hidden; }
+      .route-row { margin-top: 6px; font-size: 0.8rem; color: #fcd34d; background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 7px; padding: 6px 10px; line-height: 1.45; }
+      .route-row .to { font-weight: 700; }
+      .banner { border-radius: 8px; padding: 8px 12px; font-size: 0.8rem; margin-bottom: 10px; border: 1px solid; }
+      .banner.err { color: #fca5a5; border-color: rgba(248, 113, 113, 0.5); background: rgba(248, 113, 113, 0.08); }
+      .banner.warn { color: #fcd34d; border-color: rgba(251, 191, 36, 0.5); background: rgba(251, 191, 36, 0.08); }
+      .banner ul { padding-left: 18px; }
+      .empty { color: var(--dim); font-size: 0.82rem; padding: 18px 4px; line-height: 1.6; }
+      .final { background: var(--panel); border: 1px solid rgba(52, 211, 153, 0.4); border-radius: 10px; padding: 12px 16px; margin-bottom: 12px; }
+      .final h4 { font-size: 0.8rem; color: var(--ok); margin-bottom: 6px; display: flex; align-items: center; gap: 10px; }
+      .final pre { font-family: inherit; font-size: 0.9rem; line-height: 1.6; color: #e2e8f0; white-space: pre-wrap; word-break: break-word; }
+      .stats { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+      .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; font-size: 0.72rem; color: var(--dim); }
+      .stat b { display: block; font-size: 0.95rem; color: #f1f5f9; font-weight: 700; }
+      pre.code { background: var(--bg); border: 1px solid var(--line); border-radius: 9px; padding: 12px 14px; font-family: Consolas, "SF Mono", monospace; font-size: 0.76rem; line-height: 1.55; color: #cbd5e1; overflow-x: auto; white-space: pre; }
+      .codebar { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; font-size: 0.74rem; color: var(--dim); }
+      .toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--panel); border: 1px solid var(--accent); color: var(--text); border-radius: 9px; padding: 8px 16px; font-size: 0.8rem; opacity: 0; pointer-events: none; transition: opacity 0.25s; z-index: 50; }
+      .toast.show { opacity: 1; }
+
+      @media (max-width: 900px) {
+        .workspace { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
+        .right-col { max-height: 260px; border-left: none; border-top: 1px solid var(--line); }
+        body { overflow: auto; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="topbar">
+      <div class="brand"><span class="brand-dot"></span>Module 4 — Multi-Agent Workflow Canvas</div>
+      <div class="chip" id="providerChip" title="LLM_PROVIDER from .env: the provider an agent uses when its own setting is Default"></div>
+      <div class="spacer"></div>
+      <select id="templateSelect" title="Start from a ready-made workflow"></select>
+      <button class="btn" id="newBtn" title="Clear the canvas">New</button>
+      <button class="btn" id="importBtn" title="Open a workflow saved as JSON">Import</button>
+      <button class="btn" id="exportBtn" title="Save this workflow as JSON">Export</button>
+      <input type="file" id="importFile" accept="application/json,.json" style="display: none" />
+    </div>
+
+    <div class="taskbar">
+      <label for="task">Task</label>
+      <textarea id="task" rows="1" placeholder="What should the team work on?"></textarea>
+      <button class="btn primary" id="runBtn">▶ Run workflow</button>
+      <button class="btn stop" id="stopBtn" style="display: none">⏹ Stop</button>
+    </div>
+
+    <div class="workspace">
+      <div class="canvas-col">
+        <div class="canvas-tools">
+          <button class="btn" id="addAgent">＋ Agent</button>
+          <button class="btn" id="addRouter">＋ Router</button>
+          <button class="btn" id="tidyBtn" title="Arrange the nodes left to right">Tidy</button>
+          <span style="width: 10px"></span>
+          <button class="btn" id="zoomOut" title="Zoom out">−</button>
+          <button class="btn" id="zoomFit" title="Fit the whole workflow in view"><span id="zoomLabel">100%</span> · Fit</button>
+          <button class="btn" id="zoomIn" title="Zoom in">＋</button>
+          <span class="hint">Drag a node to move it · drag from the dot on its right edge to another node to connect · click an edge to edit it</span>
+        </div>
+        <div class="canvas-wrap" id="canvasWrap">
+          <div id="sizer">
+          <div id="canvas">
+            <svg id="edges" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <marker id="arrow-idle" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#64748b" /></marker>
+                <marker id="arrow-router" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#b98a2f" /></marker>
+                <marker id="arrow-live" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#22d3ee" /></marker>
+                <marker id="arrow-done" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#34d399" /></marker>
+              </defs>
+              <g id="edgeLayer"></g>
+              <path id="tempLink" d="" style="display: none" />
+            </svg>
+            <div id="nodes"></div>
+          </div>
+          </div>
+        </div>
+      </div>
+      <aside class="right-col" id="inspector"></aside>
+    </div>
+
+    <div class="splitter" id="splitter" title="Drag to resize"></div>
+    <div class="console" id="console">
+      <div class="tabs" id="tabs">
+        <button class="tab on" data-tab="progress">Progress</button>
+        <button class="tab" data-tab="output">Output <span class="dot" id="outDot" style="display: none"></span></button>
+        <button class="tab" data-tab="code">Code</button>
+        <button class="tab" data-tab="mermaid">Mermaid</button>
+        <span class="grow"></span>
+      </div>
+      <div class="pane on" id="pane-progress"></div>
+      <div class="pane" id="pane-output"></div>
+      <div class="pane" id="pane-code"></div>
+      <div class="pane" id="pane-mermaid"></div>
+    </div>
+    <div class="toast" id="toast"></div>
+
+    <script>
+      "use strict";
+      // ───────────────────────────── helpers ─────────────────────────────
+      const $ = (sel, root = document) => root.querySelector(sel);
+      function h(tag, attrs = {}, ...kids) {
+        const el = document.createElement(tag);
+        for (const [k, v] of Object.entries(attrs)) {
+          if (v === null || v === undefined || v === false) continue;
+          if (k === "class") el.className = v;
+          else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+          else if (k === "text") el.textContent = v;
+          else el.setAttribute(k, v === true ? "" : v);
+        }
+        for (const kid of kids.flat()) {
+          if (kid === null || kid === undefined || kid === false) continue;
+          el.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+        }
+        return el;
+      }
+      const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+      const fmtMs = (ms) => (ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(1)} s`);
+      const fmtTok = (n) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
+      let toastTimer;
+      function toast(msg) {
+        const t = $("#toast");
+        t.textContent = msg;
+        t.classList.add("show");
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => t.classList.remove("show"), 2200);
+      }
+
+      // ───────────────────────────── state ─────────────────────────────
+      const S = {
+        cfg: null,
+        templates: [],
+        wf: { name: "Untitled workflow", max_steps: 12, nodes: [], edges: [], layout: { start: { x: 30, y: 200 }, end: { x: 900, y: 200 } } },
+        task: "",
+        sel: null, // { kind: "node" | "edge", id }
+        report: null, // the last /api/validate answer
+        run: null, // the current or last run
+        abort: null,
+        busy: false,
+        counter: 1,
+        zoom: 1,
+        fitAuto: true,
+      };
+      const TERMINALS = { start: "Start", end: "End" };
+      const isTerminal = (id) => id in TERMINALS;
+      const edgeKey = (e) => `${e.source}>${e.target}`;
+      const nodeOf = (id) => S.wf.nodes.find((n) => n.id === id);
+      const labelOf = (id) => (isTerminal(id) ? TERMINALS[id] : (nodeOf(id) || {}).label || id);
+      const nodeEls = {};
+
+      function posOf(id) {
+        if (isTerminal(id)) return S.wf.layout[id] || (S.wf.layout[id] = { x: id === "start" ? 30 : 900, y: 200 });
+        return nodeOf(id);
+      }
+
+      // ───────────────────────────── persistence ─────────────────────────────
+      const STORE_KEY = "multiagent-web:v1";
+      function save() {
+        try { localStorage.setItem(STORE_KEY, JSON.stringify({ workflow: serialise(), task: S.task })); } catch {}
+      }
+      function restore() {
+        try {
+          const raw = localStorage.getItem(STORE_KEY);
+          return raw ? JSON.parse(raw) : null;
+        } catch { return null; }
+      }
+      function serialise() {
+        return JSON.parse(JSON.stringify(S.wf));
+      }
+      function loadWorkflow(wf, task) {
+        const base = { name: "Untitled workflow", max_steps: S.cfg?.limits.default_max_steps || 12, nodes: [], edges: [], layout: {} };
+        S.wf = { ...base, ...wf };
+        S.wf.nodes = (S.wf.nodes || []).map((n) => ({
+          type: "agent", role: "", provider: "", tier: "default", length: "medium", sees: "upstream", tools: [], x: 0, y: 0, ...n,
+        }));
+        S.wf.edges = (S.wf.edges || []).map((e) => ({ label: "", ...e }));
+        S.wf.layout = S.wf.layout || {};
+        S.counter = 1 + S.wf.nodes.length;
+        if (typeof task === "string") { S.task = task; $("#task").value = task; }
+        S.sel = null;
+        S.run = null;
+        renderAll();
+        fit();
+        resetConsoleForEdit();
+        scheduleValidate(0);
+        save();
+      }
+
+      // ───────────────────────────── canvas ─────────────────────────────
+      const canvas = $("#canvas");
+      const nodesLayer = $("#nodes");
+      const edgeLayer = $("#edgeLayer");
+
+      const isBack = (e) => portPoint(e.target, "in").x - portPoint(e.source, "out").x < 12;
+      const hasLoops = () => S.wf.edges.some((e) => nodeEls[e.source] && nodeEls[e.target] && isBack(e));
+      // Content size in canvas units; the sizer is that size times the zoom, so the scroll area is right
+      function contentBounds() {
+        let w = 700, hgt = 360;
+        for (const id of ["start", "end", ...S.wf.nodes.map((n) => n.id)]) {
+          const p = posOf(id), el = nodeEls[id];
+          w = Math.max(w, p.x + (el ? el.offsetWidth : 230) + 40);
+          hgt = Math.max(hgt, p.y + (el ? el.offsetHeight : 120) + (hasLoops() ? 90 : 24)); // loops swing under the lowest node
+        }
+        return { w, h: hgt };
+      }
+      function sizeCanvas() {
+        const b = contentBounds();
+        canvas.style.width = b.w + "px";
+        canvas.style.height = b.h + "px";
+        $("#sizer").style.width = b.w * S.zoom + "px";
+        $("#sizer").style.height = b.h * S.zoom + "px";
+        canvas.style.transform = `scale(${S.zoom})`;
+        $("#zoomLabel").textContent = Math.round(S.zoom * 100) + "%";
+      }
+      function setZoom(z, auto) {
+        S.zoom = clamp(z, 0.5, 1.5);
+        S.fitAuto = !!auto;
+        sizeCanvas();
+      }
+      function fit() {
+        const wrap = $("#canvasWrap"), b = contentBounds();
+        setZoom(Math.min(1, (wrap.clientWidth - 16) / b.w, (wrap.clientHeight - 54) / b.h), true);
+        wrap.scrollTo(0, 0);
+      }
+
+      function subtitle(n) {
+        const prov = n.provider || S.cfg?.default_provider || "?";
+        const info = S.cfg?.providers.find((p) => p.key === prov);
+        const model = info ? (n.tier === "small" ? info.small_model || info.model : info.model) : null;
+        return `${prov}${model ? " · " + model : ""}`;
+      }
+
+      function buildNodeEl(id) {
+        const terminal = isTerminal(id);
+        const n = terminal ? null : nodeOf(id);
+        const kind = terminal ? "terminal t-" + id : n.type;
+        const el = h("div", { class: `node ${kind}`, "data-id": id });
+        if (terminal) {
+          el.append(h("div", { class: "node-head" }, h("span", { class: "node-name", text: (id === "start" ? "▶ " : "■ ") + TERMINALS[id] })));
+        } else {
+          el.append(
+            h("div", { class: "node-head" },
+              h("span", { class: "node-ico", text: n.type === "router" ? "🔀" : "🤖" }),
+              h("span", { class: "node-name", text: n.label || "(unnamed)" }),
+              h("span", { class: "node-kind", text: n.type })),
+            h("div", { class: "node-sub", text: subtitle(n) + (n.tier === "small" ? " (small)" : "") }),
+            ...(n.tools.length ? [h("div", { class: "node-tools" }, n.tools.map((t) => h("span", { text: t })))] : []),
+            h("div", { class: "node-role", text: n.role || (n.type === "router" ? "Decides where the work goes next" : "No instructions yet") }),
+            h("div", { class: "node-status" }),
+          );
+        }
+        if (id !== "start") el.append(h("span", { class: "port in", title: "Connect an edge here" }));
+        if (id !== "end") el.append(h("span", { class: "port out", title: "Drag to another node to connect" }));
+        return el;
+      }
+
+      function renderNodes() {
+        nodesLayer.replaceChildren();
+        for (const key of Object.keys(nodeEls)) delete nodeEls[key];
+        for (const id of ["start", ...S.wf.nodes.map((n) => n.id), "end"]) {
+          const el = buildNodeEl(id);
+          nodeEls[id] = el;
+          nodesLayer.append(el);
+          placeNode(id);
+        }
+        applySelection();
+        applyRunClasses();
+        sizeCanvas();
+        drawEdges();
+      }
+
+      function refreshNode(id) {
+        const old = nodeEls[id];
+        if (!old) return;
+        const el = buildNodeEl(id);
+        old.replaceWith(el);
+        nodeEls[id] = el;
+        placeNode(id);
+        applySelection();
+        applyRunClasses();
+        sizeCanvas();
+        drawEdges();
+      }
+
+      function placeNode(id) {
+        const p = posOf(id), el = nodeEls[id];
+        el.style.left = p.x + "px";
+        el.style.top = p.y + "px";
+      }
+
+      function portPoint(id, side) {
+        const p = posOf(id), el = nodeEls[id];
+        const w = el ? el.offsetWidth : 230, hgt = el ? el.offsetHeight : 120;
+        return { x: p.x + (side === "out" ? w : 0), y: p.y + hgt / 2 };
+      }
+
+      function curve(a, b) {
+        const dx = b.x - a.x;
+        if (dx >= 12) {
+          const c = Math.max(50, dx / 2);
+          return { d: `M${a.x},${a.y} C${a.x + c},${a.y} ${b.x - c},${b.y} ${b.x},${b.y}`, mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } };
+        }
+        // a way back (a loop): out of the right edge, under both nodes, into the left edge
+        const low = Math.max(a.y, b.y) + 120;
+        const p1 = { x: a.x + 90, y: low }, p2 = { x: b.x - 90, y: low };
+        return {
+          d: `M${a.x},${a.y} C${p1.x},${p1.y} ${p2.x},${p2.y} ${b.x},${b.y}`,
+          mid: { x: (a.x + 3 * p1.x + 3 * p2.x + b.x) / 8, y: (a.y + 3 * p1.y + 3 * p2.y + b.y) / 8 },
+        };
+      }
+
+      // A way back (a loop) leaves the bottom of one node and enters the bottom of the other, so it does not cross the graph
+      function loopCurve(e) {
+        const box = (id) => { const p = posOf(id), el = nodeEls[id]; return { x: p.x, y: p.y, w: el.offsetWidth, h: el.offsetHeight }; };
+        const sb = box(e.source), tb = box(e.target);
+        const siblings = S.wf.edges.filter((x) => x.target === e.target && nodeEls[x.source] && isBack(x));
+        const i = siblings.findIndex((x) => edgeKey(x) === edgeKey(e));
+        const s = { x: sb.x + sb.w / 2, y: sb.y + sb.h };
+        const t = { x: tb.x + tb.w / 2 + (i - (siblings.length - 1) / 2) * 22, y: tb.y + tb.h };
+        const low = Math.max(s.y, t.y) + 55 + i * 14;
+        return { d: `M${s.x},${s.y} C${s.x},${low} ${t.x},${low} ${t.x},${t.y}`, mid: { x: (s.x + t.x) / 2, y: (s.y + t.y + 6 * low) / 8 } };
+      }
+
+      function drawEdges() {
+        edgeLayer.replaceChildren();
+        for (const e of S.wf.edges) {
+          if (!nodeEls[e.source] || !nodeEls[e.target]) continue;
+          const { d, mid } = isBack(e) ? loopCurve(e) : curve(portPoint(e.source, "out"), portPoint(e.target, "in"));
+          const fromRouter = nodeOf(e.source)?.type === "router";
+          const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+          g.setAttribute("class", "edge" + (fromRouter ? " router" : ""));
+          g.dataset.key = edgeKey(e);
+          const line = document.createElementNS(g.namespaceURI, "path");
+          line.setAttribute("class", "line");
+          line.setAttribute("d", d);
+          const hit = document.createElementNS(g.namespaceURI, "path");
+          hit.setAttribute("class", "hit");
+          hit.setAttribute("d", d);
+          hit.addEventListener("click", (ev) => { ev.stopPropagation(); select({ kind: "edge", id: edgeKey(e) }); });
+          g.append(line, hit);
+          if (fromRouter && e.label) {
+            const t = document.createElementNS(g.namespaceURI, "text");
+            t.setAttribute("class", "elabel");
+            t.setAttribute("x", mid.x);
+            t.setAttribute("y", mid.y + (isBack(e) ? 14 : -6));
+            t.textContent = e.label.length > 28 ? e.label.slice(0, 27) + "…" : e.label;
+            g.append(t);
+          }
+          edgeLayer.append(g);
+        }
+        applyEdgeClasses();
+      }
+
+      function applySelection() {
+        for (const [id, el] of Object.entries(nodeEls)) el.classList.toggle("selected", S.sel?.kind === "node" && S.sel.id === id);
+        applyEdgeClasses();
+      }
+      function applyEdgeClasses() {
+        for (const g of edgeLayer.children) {
+          const key = g.dataset.key;
+          g.classList.toggle("selected", S.sel?.kind === "edge" && S.sel.id === key);
+          const st = S.run?.edges[key];
+          g.classList.toggle("flow", st === "flow");
+          g.classList.toggle("done", st === "done");
+        }
+      }
+
+      function select(sel) {
+        if (S.busy) return;
+        S.sel = sel;
+        applySelection();
+        renderInspector();
+      }
+
+      // ── dragging nodes, connecting edges ──
+      let drag = null, link = null;
+      nodesLayer.addEventListener("pointerdown", (ev) => {
+        if (S.busy || ev.button !== 0) return;
+        const nodeEl = ev.target.closest(".node");
+        if (!nodeEl) return;
+        const id = nodeEl.dataset.id;
+        if (ev.target.classList.contains("port") && ev.target.classList.contains("out")) {
+          const a = portPoint(id, "out");
+          link = { from: id, a };
+          $("#tempLink").style.display = "";
+          $("#tempLink").setAttribute("d", `M${a.x},${a.y} L${a.x},${a.y}`);
+          ev.preventDefault();
+          return;
+        }
+        if (ev.target.classList.contains("port")) return;
+        const p = posOf(id);
+        drag = { id, x0: p.x, y0: p.y, moved: false, startX: ev.clientX, startY: ev.clientY };
+        ev.preventDefault();
+      });
+      window.addEventListener("pointermove", (ev) => {
+        if (drag) {
+          if (!drag.moved && Math.hypot(ev.clientX - drag.startX, ev.clientY - drag.startY) < 4) return;
+          drag.moved = true;
+          const p = posOf(drag.id);
+          p.x = Math.max(0, Math.round(drag.x0 + (ev.clientX - drag.startX) / S.zoom));
+          p.y = Math.max(0, Math.round(drag.y0 + (ev.clientY - drag.startY) / S.zoom));
+          placeNode(drag.id);
+          drawEdges();
+        } else if (link) {
+          const rect = canvas.getBoundingClientRect();
+          const x = (ev.clientX - rect.left) / S.zoom, y = (ev.clientY - rect.top) / S.zoom;
+          $("#tempLink").setAttribute("d", curve(link.a, { x, y }).d);
+          const over = document.elementFromPoint(ev.clientX, ev.clientY)?.closest(".node");
+          for (const el of Object.values(nodeEls)) el.classList.toggle("drop-ok", el === over && canConnect(link.from, over.dataset.id));
+        }
+      });
+      window.addEventListener("pointerup", (ev) => {
+        if (drag) {
+          const moved = drag.moved;
+          const id = drag.id;
+          drag = null;
+          if (moved) { sizeCanvas(); drawEdges(); save(); }
+          else if (!isTerminal(id)) select({ kind: "node", id });
+          else select(null);
+        } else if (link) {
+          const over = document.elementFromPoint(ev.clientX, ev.clientY)?.closest(".node");
+          const from = link.from;
+          link = null;
+          $("#tempLink").style.display = "none";
+          for (const el of Object.values(nodeEls)) el.classList.remove("drop-ok");
+          if (over && canConnect(from, over.dataset.id)) addEdge(from, over.dataset.id);
+        }
+      });
+      $("#canvasWrap").addEventListener("pointerdown", (ev) => {
+        if (ev.target.closest(".node") || ev.target.closest(".edge") || ev.target.closest(".canvas-tools")) return;
+        select(null);
+      });
+
+      function canConnect(from, to) {
+        if (from === to || from === "end" || to === "start") return false;
+        return !S.wf.edges.some((e) => e.source === from && e.target === to);
+      }
+      function addEdge(source, target) {
+        S.wf.edges.push({ source, target, label: "" });
+        drawEdges();
+        changed();
+        const e = S.wf.edges.at(-1);
+        if (nodeOf(source)?.type === "router") select({ kind: "edge", id: edgeKey(e) });
+      }
+
+      // ── adding, deleting, tidying ──
+      function freeSpot() {
+        const wrap = $("#canvasWrap");
+        let x = wrap.scrollLeft / S.zoom + 160, y = wrap.scrollTop / S.zoom + 60;
+        while (S.wf.nodes.some((n) => Math.abs(n.x - x) < 40 && Math.abs(n.y - y) < 40)) { x += 30; y += 30; }
+        return { x, y };
+      }
+      function uniqueLabel(base) {
+        const taken = new Set(S.wf.nodes.map((n) => n.label.toLowerCase()));
+        let i = 1, label = base;
+        while (taken.has(label.toLowerCase())) label = `${base} ${++i}`;
+        return label;
+      }
+      function addNode(type) {
+        if (S.busy) return;
+        if (S.wf.nodes.length >= (S.cfg?.limits.max_nodes || 12)) return toast(`A workflow can have up to ${S.cfg.limits.max_nodes} nodes.`);
+        const id = `n${S.counter++}${Math.random().toString(36).slice(2, 5)}`;
+        const { x, y } = freeSpot();
+        S.wf.nodes.push({
+          id, type, label: uniqueLabel(type === "router" ? "Router" : "Agent"), role: "", provider: "",
+          tier: type === "router" ? "small" : "default", length: type === "router" ? "short" : "medium",
+          sees: type === "router" ? "all" : "upstream", tools: [], x, y,
+        });
+        renderNodes();
+        select({ kind: "node", id });
+        changed();
+        setTimeout(() => $("#f-label")?.select(), 0);
+      }
+      function deleteSelection() {
+        if (S.busy || !S.sel) return;
+        if (S.sel.kind === "node") {
+          const id = S.sel.id;
+          S.wf.nodes = S.wf.nodes.filter((n) => n.id !== id);
+          S.wf.edges = S.wf.edges.filter((e) => e.source !== id && e.target !== id);
+        } else {
+          S.wf.edges = S.wf.edges.filter((e) => edgeKey(e) !== S.sel.id);
+        }
+        S.sel = null;
+        renderNodes();
+        renderInspector();
+        changed();
+      }
+      window.addEventListener("keydown", (ev) => {
+        if ((ev.key === "Delete" || ev.key === "Backspace") && !/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)) {
+          ev.preventDefault();
+          deleteSelection();
+        }
+      });
+
+      function tidy() {
+        if (S.busy) return;
+        const out = {};
+        for (const e of S.wf.edges) (out[e.source] ||= []).push(e.target);
+        const state = {}, back = new Set();
+        (function dfs(u) {
+          state[u] = 1;
+          for (const v of out[u] || []) {
+            if (state[v] === 1) back.add(u + ">" + v);
+            else if (!state[v]) dfs(v);
+          }
+          state[u] = 2;
+        })("start");
+        const ids = ["start", ...S.wf.nodes.map((n) => n.id), "end"];
+        const layer = Object.fromEntries(ids.map((id) => [id, id === "start" ? 0 : 1]));
+        for (let i = 0; i < ids.length + 2; i++)
+          for (const e of S.wf.edges) if (!back.has(edgeKey(e))) layer[e.target] = Math.max(layer[e.target], layer[e.source] + 1);
+        const last = Math.max(...S.wf.nodes.map((n) => layer[n.id]), 1);
+        layer.end = Math.max(layer.end, last + 1);
+        const columns = {};
+        for (const n of S.wf.nodes) (columns[layer[n.id]] ||= []).push(n);
+        for (const [l, col] of Object.entries(columns)) {
+          col.forEach((n, i) => {
+            n.x = 150 + (l - 1) * 290;
+            n.y = Math.max(40, 230 + (i - (col.length - 1) / 2) * 175 - 45);
+          });
+        }
+        S.wf.layout.start = { x: 30, y: 215 };
+        S.wf.layout.end = { x: 150 + (layer.end - 1) * 290, y: 215 };
+        renderNodes();
+        fit();
+        changed();
+      }
+
+      // ───────────────────────────── inspector ─────────────────────────────
+      function field(label, control, note) {
+        return h("div", { class: "field" }, h("label", { text: label }), control, note ? h("div", { class: "note", text: note }) : null);
+      }
+
+      function renderInspector() {
+        const box = $("#inspector");
+        box.replaceChildren();
+        const lock = S.busy;
+        box.append(h("h3", {}, "Checks"), h("div", { id: "checksHost" }, checksBox()));
+
+        if (S.sel?.kind === "node" && nodeOf(S.sel.id)) {
+          const n = nodeOf(S.sel.id);
+          const upd = (patch, rerender) => { Object.assign(n, patch); refreshNode(n.id); changed(); if (rerender) renderInspector(); };
+          box.append(h("h3", {}, n.type === "router" ? "Router" : "Agent"));
+          box.append(field("Name", h("input", { type: "text", id: "f-label", maxlength: 40, value: n.label, disabled: lock,
+            oninput: (e) => { n.label = e.target.value; refreshNode(n.id); changed(); } })));
+          box.append(field("Kind", h("div", { class: "seg" },
+            h("button", { class: "on-agent " + (n.type === "agent" ? "on" : ""), disabled: lock, onclick: () => upd({ type: "agent" }, true), text: "Agent" }),
+            h("button", { class: "router " + (n.type === "router" ? "on router" : ""), disabled: lock, onclick: () => upd({ type: "router" }, true), text: "Router" })),
+            n.type === "router" ? "A router picks which of its outgoing edges the work follows next." : "An agent answers using its instructions, then passes its work along every outgoing edge."));
+          box.append(field(n.type === "router" ? "How it should decide" : "Role and instructions",
+            h("textarea", { rows: 6, id: "f-role", maxlength: 2000, disabled: lock, value: n.role,
+              placeholder: n.type === "router" ? "e.g. Send the ticket to the specialist who has not answered yet; finish when the writer can reply." : "e.g. You are a network engineer. Diagnose VPN problems and cite KB articles.",
+              oninput: (e) => { n.role = e.target.value; refreshNode(n.id); changed(); } }),
+            n.type === "router" ? "Describe each route on its edge: click an edge leaving this router." : null));
+          $("#f-role").value = n.role;
+
+          const provSel = h("select", { disabled: lock, onchange: (e) => upd({ provider: e.target.value }, true) },
+            h("option", { value: "", text: `Default (${S.cfg?.default_provider || "—"})` }),
+            S.cfg.providers.map((p) => h("option", { value: p.key, disabled: !p.configured, text: p.label + (p.configured ? "" : " — not configured") })));
+          provSel.value = n.provider;
+          const tierSel = h("select", { disabled: lock, onchange: (e) => upd({ tier: e.target.value }, true) },
+            h("option", { value: "default", text: "Main model" }), h("option", { value: "small", text: "Small (faster)" }));
+          tierSel.value = n.tier;
+          box.append(h("div", { class: "row" }, field("Provider", provSel), field("Model", tierSel)));
+          box.append(h("div", { class: "note", style: "margin:-4px 0 10px;font-size:.68rem;color:var(--dim);font-family:Consolas,monospace", text: "uses " + subtitle(n) }));
+
+          if (n.type === "agent") {
+            const lenSel = h("select", { disabled: lock, onchange: (e) => upd({ length: e.target.value }) },
+              Object.entries(S.cfg.lengths).map(([k, w]) => h("option", { value: k, text: `${k[0].toUpperCase() + k.slice(1)} (~${w} words)` })));
+            lenSel.value = n.length;
+            box.append(field("Answer length", lenSel));
+          }
+          const seesSel = h("select", { disabled: lock, onchange: (e) => upd({ sees: e.target.value }) },
+            h("option", { value: "upstream", text: "Only the agents wired into it" }), h("option", { value: "all", text: "Everything produced so far" }));
+          seesSel.value = n.sees;
+          box.append(field("Sees", seesSel, "The task is always included. A node also sees its own previous answer when a loop sends it back."));
+
+          if (n.type === "agent") {
+            box.append(h("h3", {}, "Tools"));
+            for (const t of S.cfg.tools) {
+              box.append(h("label", { class: "tool" },
+                h("input", { type: "checkbox", disabled: lock, checked: n.tools.includes(t.name) || null,
+                  onchange: (e) => { n.tools = e.target.checked ? [...n.tools, t.name] : n.tools.filter((x) => x !== t.name); refreshNode(n.id); changed(); } }),
+                h("span", {}, h("code", { text: t.name }), " — " + t.description)));
+            }
+          }
+          box.append(h("div", { style: "margin-top:14px" }, h("button", { class: "btn danger", disabled: lock, onclick: deleteSelection, text: "Delete node" })));
+        } else if (S.sel?.kind === "edge") {
+          const e = S.wf.edges.find((x) => edgeKey(x) === S.sel.id);
+          if (!e) { S.sel = null; return renderInspector(); }
+          box.append(h("h3", {}, "Edge"));
+          box.append(h("div", { class: "help", style: "margin-bottom:10px" }, h("b", { text: labelOf(e.source) }), "  →  ", h("b", { text: labelOf(e.target) })));
+          if (nodeOf(e.source)?.type === "router") {
+            box.append(field("When should the router take this route?",
+              h("textarea", { rows: 4, maxlength: 160, disabled: lock, value: e.label,
+                placeholder: e.target === "end" ? "e.g. the draft meets every requirement" : "e.g. the ticket mentions VPN and the network specialist has not answered yet",
+                oninput: (ev) => { e.label = ev.target.value; drawEdges(); changed(); } }),
+              "The router reads this text to choose. Be specific: it is the only guidance it has for this route."));
+            $("#inspector textarea").value = e.label;
+          } else {
+            box.append(h("div", { class: "help", text: "After the first agent finishes, its work goes along every outgoing edge. Two edges leaving one agent run in parallel." }));
+          }
+          box.append(h("div", { style: "margin-top:14px" }, h("button", { class: "btn danger", disabled: lock, onclick: deleteSelection, text: "Delete edge" })));
+        } else {
+          box.append(h("h3", {}, "Workflow"));
+          box.append(field("Name", h("input", { type: "text", maxlength: 80, value: S.wf.name, disabled: lock, oninput: (e) => { S.wf.name = e.target.value; changed(false); } })));
+          box.append(field("Step limit", h("input", { type: "number", min: S.cfg.limits.min_steps, max: S.cfg.limits.max_steps, value: S.wf.max_steps, disabled: lock,
+            oninput: (e) => { S.wf.max_steps = clamp(parseInt(e.target.value) || S.cfg.limits.min_steps, S.cfg.limits.min_steps, S.cfg.limits.max_steps); changed(); } }),
+            "The most node runs one execution may use. A router ends the run when it can no longer fit another agent and a closing step: this is what stops a loop. Workflows without a router never loop, so it does not apply."));
+          box.append(h("h3", {}, "How to use the canvas"));
+          box.append(h("ul", { class: "help" },
+            h("li", {}, "Pick a ", h("b", { text: "template" }), " (top right) or add nodes with ", h("b", { text: "＋ Agent" }), " and ", h("b", { text: "＋ Router" }), "."),
+            h("li", {}, "Drag from the dot on a node's right edge to another node to connect them."),
+            h("li", {}, "Click a node or an edge to configure it. ", h("kbd", { text: "Del" }), " removes the selection."),
+            h("li", {}, "Two edges leaving an agent run ", h("b", { text: "in parallel" }), "; a router takes exactly one of its edges."),
+            h("li", {}, "Press ", h("b", { text: "Run" }), " and watch each node light up. The Code tab shows the LangGraph this canvas compiles to.")));
+        }
+      }
+
+      function checksBox() {
+        const r = S.report;
+        if (!r) return h("div", { class: "checks", text: "Checking…" });
+        const joinText = Object.entries(r.joins || {}).map(([id, mode]) =>
+          `${labelOf(id)} ${mode === "all" ? "waits for all its inputs" : "runs when any input arrives"}`);
+        if (r.ok) {
+          return h("div", { class: "checks ok" }, "✓ Ready to run",
+            r.warnings.map((w) => h("div", { class: "w", text: "⚠ " + w })),
+            joinText.length ? h("div", { class: "j", text: "Join: " + joinText.join("; ") }) : null);
+        }
+        return h("div", { class: "checks bad" },
+          h("ul", {}, r.errors.map((e) => h("li", { class: "e", text: e })), r.warnings.map((w) => h("li", { class: "w", text: w }))));
+      }
+
+      // ───────────────────────────── validation ─────────────────────────────
+      let validateTimer;
+      function scheduleValidate(delay = 350) {
+        clearTimeout(validateTimer);
+        validateTimer = setTimeout(validateNow, delay);
+      }
+      async function validateNow() {
+        try {
+          const res = await fetch("/api/validate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(serialise()) });
+          if (!res.ok) {
+            const body = await res.json().catch(() => ({}));
+            S.report = { ok: false, errors: [typeof body.detail === "string" ? body.detail : "The workflow is not valid JSON for the server."], warnings: [], joins: {} };
+          } else {
+            S.report = await res.json();
+          }
+        } catch {
+          S.report = { ok: false, errors: ["Could not reach the server."], warnings: [], joins: {} };
+        }
+        $("#runBtn").disabled = S.busy || !S.report.ok;
+        $("#runBtn").title = S.report.ok ? "" : S.report.errors[0] || "";
+        $("#checksHost")?.replaceChildren(checksBox());
+        renderCode();
+      }
+      function changed(revalidate = true) {
+        save();
+        if (revalidate) scheduleValidate();
+      }
+
+      // ───────────────────────────── Code and Mermaid tabs ─────────────────────────────
+      function copyButton(getText) {
+        return h("button", { class: "btn", text: "Copy", onclick: async () => {
+          try { await navigator.clipboard.writeText(getText()); toast("Copied"); } catch { toast("Copy failed: select the text instead"); }
+        } });
+      }
+      function renderCode() {
+        const r = S.report;
+        const code = $("#pane-code"), mm = $("#pane-mermaid");
+        code.replaceChildren();
+        mm.replaceChildren();
+        if (!r || (!r.code && !r.mermaid)) {
+          const why = h("div", { class: "empty", text: "Fix the problems listed under Checks, and the LangGraph this canvas compiles to appears here." });
+          code.append(why); mm.append(why.cloneNode(true));
+          return;
+        }
+        code.append(h("div", { class: "codebar" }, h("span", { text: "The same graph written by hand: nodes, edges, joins and routers. Simplified: no streaming or tools." }), copyButton(() => r.code)),
+          h("pre", { class: "code", text: r.code }));
+        mm.append(h("div", { class: "codebar" }, h("span", { text: "LangGraph's own drawing of the compiled graph (dashed arrows are a router's routes). Paste it into mermaid.live to see it." }), copyButton(() => r.mermaid)),
+          h("pre", { class: "code", text: r.mermaid }));
+      }
+
+      // ───────────────────────────── tabs ─────────────────────────────
+      function showTab(name) {
+        for (const t of document.querySelectorAll(".tab")) t.classList.toggle("on", t.dataset.tab === name);
+        for (const p of document.querySelectorAll(".pane")) p.classList.toggle("on", p.id === "pane-" + name);
+        if (name === "output") $("#outDot").style.display = "none";
+      }
+      $("#tabs").addEventListener("click", (ev) => { const t = ev.target.closest(".tab"); if (t) showTab(t.dataset.tab); });
+
+      // ───────────────────────────── running ─────────────────────────────
+      function newRun() {
+        return { started: performance.now(), steps: [], active: {}, nodes: {}, edges: {}, done: 0, max: S.wf.max_steps, status: "running", routers: S.wf.nodes.some((n) => n.type === "router") };
+      }
+      function applyRunClasses() {
+        for (const [id, el] of Object.entries(nodeEls)) {
+          for (const c of ["running", "done", "error", "skipped", "stopped"]) el.classList.remove(c);
+          const st = S.run?.nodes[id];
+          if (st) el.classList.add(st.state);
+          const status = el.querySelector(".node-status");
+          if (status) {
+            status.replaceChildren();
+            if (st?.state === "running") status.append(h("span", { class: "spin" }), h("span", { class: "elapsed", "data-since": st.since, text: "working…" }));
+            else if (st?.state === "done") status.append(`✓ ${fmtMs(st.total || 0)}${st.runs > 1 ? ` in total · ran ${st.runs}×` : ""}`);
+            else if (st?.state === "error") status.append("✕ failed");
+            else if (st?.state === "stopped") status.append("■ stopped");
+            else if (st?.state === "skipped") status.append("not run");
+          }
+        }
+        applyEdgeClasses();
+      }
+      function setLocked(on) {
+        S.busy = on;
+        $("#canvasWrap").classList.toggle("locked", on);
+        $("#runBtn").style.display = on ? "none" : "";
+        $("#stopBtn").style.display = on ? "" : "none";
+        $("#runBtn").disabled = on || !(S.report && S.report.ok);
+        for (const id of ["addAgent", "addRouter", "tidyBtn", "newBtn", "importBtn", "templateSelect"]) $("#" + id).disabled = on;
+        $("#task").disabled = on;
+        renderInspector();
+      }
+      function resetConsoleForEdit() {
+        $("#pane-progress").replaceChildren(h("div", { class: "empty" },
+          "Press ", h("b", { text: "▶ Run workflow" }), ". Each node lights up on the canvas as it starts, and its output streams in here, with tool calls, routing decisions, time and tokens."));
+        $("#pane-output").replaceChildren(h("div", { class: "empty", text: "The final answer appears here when the run finishes." }));
+        $("#outDot").style.display = "none";
+        showTab("progress");
+      }
+
+      let ticker = null;
+      function tick() {
+        const r = S.run;
+        if (!r) return;
+        const now = performance.now();
+        for (const el of document.querySelectorAll(".node-status .elapsed")) el.textContent = `working… ${fmtMs(now - Number(el.dataset.since))}`;
+        const label = $("#plabel");
+        if (label && r.status === "running") label.textContent = progressText();
+      }
+      function progressText() {
+        const r = S.run;
+        const elapsed = fmtMs(performance.now() - r.started);
+        const steps = r.routers ? `step ${r.steps.length} of up to ${r.max}` : `${r.done} of ${S.wf.nodes.length} nodes`;
+        return `${steps} · ${elapsed} · ${fmtTok(r.tokens || 0)} tokens`;
+      }
+      function renderProgressHeader() {
+        const r = S.run;
+        const pct = r.status === "running"
+          ? (r.routers ? (r.steps.length / r.max) * 100 : (r.done / Math.max(1, S.wf.nodes.length)) * 100)
+          : r.status === "failed" || r.status === "cancelled" ? Math.max(8, (r.done / Math.max(1, S.wf.nodes.length)) * 100) : 100;
+        const bar = $("#pbar");
+        if (bar) {
+          bar.className = "bar " + (r.status === "completed" || r.status === "limit" ? "done" : r.status === "failed" ? "bad" : "");
+          bar.firstChild.style.width = clamp(pct, 3, 100) + "%";
+        }
+        const trail = $("#trail");
+        if (trail) {
+          trail.replaceChildren(...r.steps.map((s, i) => h("span", { class: s.state, text: `${i + 1}. ${s.label}` })));
+        }
+        const label = $("#plabel");
+        if (label) label.textContent = r.status === "running" ? progressText() : r.finalLine || progressText();
+      }
+
+      function stepCard(ev) {
+        const r = S.run;
+        const isRouter = ev.type === "router";
+        const card = h("div", { class: "step running " + (isRouter ? "router" : "") },
+          h("div", { class: "step-head" },
+            h("span", { class: "no", text: "#" + (r.steps.length + 1) }),
+            h("b", { text: ev.label }),
+            h("span", { class: "node-kind", style: "font-size:.58rem;border-radius:99px;padding:1px 7px;border:1px solid var(--line);color:var(--dim);text-transform:uppercase", text: ev.type }),
+            h("span", { class: "mdl", text: `${ev.provider} · ${ev.model}` }),
+            h("span", { class: "meta", text: "starting…" })),
+          h("div", { class: "waiting" }, h("span", { class: "spin" }), h("span", { text: isRouter ? "deciding where the work goes next…" : "working…" })),
+          h("div", { class: "step-body" }));
+        const step = { node: ev.node, label: ev.label, card, state: "running", text: "", since: performance.now(), body: card.querySelector(".step-body"), waiting: card.querySelector(".waiting"), meta: card.querySelector(".meta") };
+        r.steps.push(step);
+        r.active[ev.node] = step;
+        $("#steps").append(card);
+        autoscroll();
+        return step;
+      }
+      function autoscroll() {
+        const pane = $("#pane-progress");
+        if (pane.scrollHeight - pane.scrollTop - pane.clientHeight < 140) pane.scrollTop = pane.scrollHeight;
+      }
+
+      function incomingEdges(id) {
+        return S.wf.edges.filter((e) => e.target === id).map(edgeKey);
+      }
+
+      function onEvent(ev) {
+        const r = S.run;
+        switch (ev.event) {
+          case "run_started":
+            break;
+          case "node_started": {
+            const prev = r.nodes[ev.node];
+            r.nodes[ev.node] = { state: "running", since: performance.now(), ms: 0, total: prev ? prev.total : 0, runs: prev ? prev.runs : 0 };
+            // The edges into this node light up when the node they come from has finished (or is Start)
+            for (const e of S.wf.edges.filter((x) => x.target === ev.node)) {
+              const src = e.source;
+              const chosen = r.routes[src];
+              if (src === "start" || r.nodes[src]?.state === "done") {
+                if (nodeOf(src)?.type === "router" && chosen !== ev.node) continue;
+                r.edges[edgeKey(e)] = "flow";
+              }
+            }
+            stepCard(ev);
+            applyRunClasses();
+            renderProgressHeader();
+            break;
+          }
+          case "token": {
+            const s = r.active[ev.node];
+            if (!s) break;
+            if (s.waiting) { s.waiting.remove(); s.waiting = null; s.meta.textContent = "writing…"; }
+            s.text += ev.delta;
+            s.body.replaceChildren(s.text, h("span", { class: "cursor" }));
+            autoscroll();
+            break;
+          }
+          case "tool_call": {
+            const s = r.active[ev.node];
+            if (!s) break;
+            if (s.waiting) { s.waiting.remove(); s.waiting = null; }
+            s.toolRow = h("div", { class: "tool-row" }, `🔧 ${ev.name}(${Object.values(ev.args || {}).map((v) => JSON.stringify(v)).join(", ")})`, h("div", { class: "res", text: "running…" }));
+            s.card.insertBefore(s.toolRow, s.body);
+            autoscroll();
+            break;
+          }
+          case "tool_result": {
+            const s = r.active[ev.node];
+            if (s?.toolRow) s.toolRow.querySelector(".res").textContent = ev.result;
+            break;
+          }
+          case "route": {
+            const s = r.active[ev.node];
+            r.routes[ev.node] = ev.next;
+            if (s) {
+              if (s.waiting) { s.waiting.remove(); s.waiting = null; }
+              s.card.insertBefore(h("div", { class: "route-row" },
+                "→ ", h("span", { class: "to", text: ev.next_label }), ev.forced ? "  (step limit)" : "", h("div", { text: ev.reason }),
+                ev.instruction ? h("div", { style: "color:var(--muted)", text: "Instruction: " + ev.instruction }) : null), s.body);
+            }
+            r.edges[`${ev.node}>${ev.next}`] = "flow";
+            applyEdgeClasses();
+            break;
+          }
+          case "node_finished": {
+            const s = r.active[ev.node];
+            const st = r.nodes[ev.node];
+            if (st) { st.state = "done"; st.ms = ev.ms; st.total += ev.ms; st.runs += 1; }
+            r.done += 1;
+            r.tokens = (r.tokens || 0) + (ev.input_tokens || 0) + (ev.output_tokens || 0);
+            // The edges that led into the node are done; the edge a router took stays lit until its target starts
+            for (const key of incomingEdges(ev.node)) if (r.edges[key] === "flow") r.edges[key] = "done";
+            if (s) {
+              s.state = "done";
+              s.card.classList.remove("running");
+              if (s.waiting) { s.waiting.remove(); s.waiting = null; }
+              if (!s.card.querySelector(".route-row")) s.body.textContent = ev.output;
+              else s.body.replaceChildren();
+              s.meta.textContent = `${fmtMs(ev.ms)} · ${ev.input_tokens || 0} in / ${ev.output_tokens || 0} out`;
+            }
+            applyRunClasses();
+            renderProgressHeader();
+            autoscroll();
+            break;
+          }
+          case "node_error": {
+            const s = r.active[ev.node];
+            if (r.nodes[ev.node]) r.nodes[ev.node].state = "error";
+            if (s) {
+              s.state = "error";
+              s.card.classList.remove("running");
+              s.card.classList.add("error");
+              if (s.waiting) { s.waiting.remove(); s.waiting = null; }
+              s.body.replaceChildren(h("span", { style: "color:var(--bad)", text: "✕ " + ev.error }));
+              s.meta.textContent = "failed";
+            }
+            applyRunClasses();
+            break;
+          }
+          case "guardrail":
+            $("#steps").append(h("div", { class: "banner warn", text: `Input blocked by the guardrail (${ev.reason}). No agent ran.` }));
+            break;
+          case "error":
+            r.status = "failed";
+            $("#steps").append(h("div", { class: "banner err", text: "Run stopped: " + ev.error }));
+            break;
+          case "run_finished":
+            finishRun(ev);
+            break;
+        }
+      }
+
+      function finishRun(ev) {
+        const r = S.run;
+        r.status = ev.status === "limit" ? "limit" : ev.status === "blocked" ? "blocked" : "completed";
+        // Nodes that never ran on this path, and the edges the run took into End
+        for (const n of S.wf.nodes) if (!r.nodes[n.id]) r.nodes[n.id] = { state: "skipped" };
+        for (const e of S.wf.edges.filter((x) => x.target === "end")) {
+          const src = nodeOf(e.source);
+          if (src && r.nodes[e.source]?.state === "done" && (src.type !== "router" || r.routes[e.source] === "end")) r.edges[edgeKey(e)] = "done";
+        }
+        for (const k of Object.keys(r.edges)) if (r.edges[k] === "flow") r.edges[k] = "done";
+        r.nodes.end = { state: r.status === "blocked" ? "skipped" : "done", ms: 0, total: 0, runs: 1 };
+        r.nodes.start = { state: "done", ms: 0, total: 0, runs: 1 };
+        r.finalLine = `${r.status === "limit" ? "stopped at the step limit" : r.status === "blocked" ? "blocked" : "completed"} · ${ev.steps} steps · ${fmtMs(ev.ms)} · ${fmtTok(ev.input_tokens + ev.output_tokens)} tokens`;
+        applyRunClasses();
+        renderProgressHeader();
+        renderOutput(ev);
+        $("#outDot").style.display = ev.final.length ? "" : "none";
+        if (ev.final.length) showTab("output");
+      }
+
+      function renderOutput(ev) {
+        const pane = $("#pane-output");
+        pane.replaceChildren();
+        if (ev.status === "limit") pane.append(h("div", { class: "banner warn", text: `The run stopped at its step limit (${S.wf.max_steps}). The answer below is the last agent's work; raise the limit on the Workflow panel, or tighten the router's instructions.` }));
+        if (ev.status === "blocked") pane.append(h("div", { class: "banner warn", text: "The task was blocked by the input guardrail, so no agent ran." }));
+        pane.append(h("div", { class: "stats" },
+          [["Steps", ev.steps], ["Time", fmtMs(ev.ms)], ["Input tokens", fmtTok(ev.input_tokens)], ["Output tokens", fmtTok(ev.output_tokens)]].map(([k, v]) =>
+            h("div", { class: "stat" }, h("b", { text: String(v) }), k))));
+        for (const f of ev.final) {
+          pane.append(h("div", { class: "final" },
+            h("h4", {}, `Final output · ${f.label}`, copyButton(() => f.output)),
+            h("pre", { text: f.output })));
+        }
+        if (!ev.final.length && ev.status !== "blocked") pane.append(h("div", { class: "empty", text: "No agent produced an answer." }));
+        pane.append(h("div", { class: "trail" }, ev.path.map((id, i) => h("span", { class: "done", text: `${i + 1}. ${labelOf(id)}` }))));
+      }
+
+      async function runWorkflow() {
+        if (S.busy) return;
+        const task = $("#task").value.trim();
+        if (!task) { $("#task").focus(); return toast("Type a task for the team first."); }
+        S.task = task;
+        save();
+        await validateNow();
+        if (!S.report.ok) { showTab("progress"); return toast("Fix the problems under Checks first."); }
+
+        S.run = newRun();
+        S.run.routes = {};
+        S.sel = null;
+        applySelection();
+        showTab("progress");
+        $("#pane-progress").replaceChildren(
+          h("div", { class: "phead" },
+            h("div", { class: "progress" }, h("div", { class: "bar", id: "pbar" }, h("div")), h("span", { class: "plabel", id: "plabel", text: "starting…" })),
+            h("div", { class: "trail", id: "trail" })),
+          h("div", { id: "steps" }));
+        $("#pane-output").replaceChildren(h("div", { class: "empty", text: "Running… the answer appears here when the last node finishes." }));
+        $("#outDot").style.display = "none";
+        setLocked(true);
+        applyRunClasses();
+        renderProgressHeader();
+        ticker = setInterval(tick, 200);
+        S.abort = new AbortController();
+
+        try {
+          const res = await fetch("/api/run", { method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ workflow: serialise(), task }), signal: S.abort.signal });
+          if (!res.ok || !res.body) {
+            const body = await res.json().catch(() => ({}));
+            const d = body.detail;
+            const problems = d && d.problems ? d.problems : [typeof d === "string" ? d : "The server refused the request."];
+            S.run.status = "failed";
+            $("#steps").append(h("div", { class: "banner err" }, "The workflow cannot run:", h("ul", {}, problems.map((p) => h("li", { text: p })))));
+          } else {
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let buf = "";
+            for (;;) {
+              const { value, done } = await reader.read();
+              if (done) break;
+              buf += decoder.decode(value, { stream: true });
+              let idx;
+              while ((idx = buf.indexOf("\n\n")) >= 0) {
+                const raw = buf.slice(0, idx);
+                buf = buf.slice(idx + 2);
+                if (!raw.startsWith("data: ")) continue;
+                try { onEvent(JSON.parse(raw.slice(6))); } catch (err) { console.error(err); }
+              }
+            }
+          }
+        } catch (err) {
+          if (err.name === "AbortError") {
+            S.run.status = "cancelled";
+            $("#steps").append(h("div", { class: "banner warn", text: "Run cancelled." }));
+          } else {
+            S.run.status = "failed";
+            $("#steps").append(h("div", { class: "banner err", text: "Connection lost: " + err.message }));
+          }
+        }
+        clearInterval(ticker);
+        if (S.run.status === "running") S.run.status = "failed";
+        // A run that stopped early: nodes still "running" are stopped, not working
+        for (const st of Object.values(S.run.nodes)) if (st.state === "running") st.state = "stopped";
+        for (const k of Object.keys(S.run.edges)) if (S.run.edges[k] === "flow") S.run.edges[k] = "idle";
+        for (const s of S.run.steps) if (s.state === "running") { s.state = "stopped"; s.card.classList.remove("running"); s.waiting?.remove(); s.meta.textContent = "stopped"; }
+        applyRunClasses();
+        renderProgressHeader();
+        setLocked(false);
+      }
+      $("#runBtn").onclick = runWorkflow;
+      $("#stopBtn").onclick = () => S.abort?.abort();
+      $("#task").addEventListener("keydown", (ev) => { if (ev.key === "Enter" && (ev.metaKey || ev.ctrlKey)) { ev.preventDefault(); runWorkflow(); } });
+      $("#task").addEventListener("input", (ev) => { S.task = ev.target.value; save(); });
+
+      // ───────────────────────────── toolbar ─────────────────────────────
+      $("#addAgent").onclick = () => addNode("agent");
+      $("#addRouter").onclick = () => addNode("router");
+      $("#tidyBtn").onclick = tidy;
+      $("#zoomIn").onclick = () => { setZoom(S.zoom + 0.1); drawEdges(); };
+      $("#zoomOut").onclick = () => { setZoom(S.zoom - 0.1); drawEdges(); };
+      $("#zoomFit").onclick = () => { fit(); drawEdges(); };
+      $("#newBtn").onclick = () => {
+        $("#templateSelect").value = "";
+        loadWorkflow({ name: "Untitled workflow", max_steps: S.cfg.limits.default_max_steps, nodes: [], edges: [], layout: { start: { x: 30, y: 200 }, end: { x: 700, y: 200 } } }, "");
+      };
+      $("#exportBtn").onclick = () => {
+        const blob = new Blob([JSON.stringify({ format: "multiagent-web/1", task: S.task, workflow: serialise() }, null, 2)], { type: "application/json" });
+        const a = h("a", { href: URL.createObjectURL(blob), download: (S.wf.name || "workflow").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") + ".json" });
+        a.click();
+        URL.revokeObjectURL(a.href);
+      };
+      $("#importBtn").onclick = () => $("#importFile").click();
+      $("#importFile").addEventListener("change", async (ev) => {
+        const file = ev.target.files[0];
+        ev.target.value = "";
+        if (!file) return;
+        try {
+          const data = JSON.parse(await file.text());
+          const wf = data.workflow || data;
+          if (!Array.isArray(wf.nodes) || !Array.isArray(wf.edges)) throw new Error("no nodes and edges");
+          $("#templateSelect").value = "";
+          loadWorkflow(wf, typeof data.task === "string" ? data.task : S.task);
+          toast("Workflow imported");
+        } catch (err) {
+          toast("That file is not a workflow: " + err.message);
+        }
+      });
+      $("#templateSelect").addEventListener("change", (ev) => {
+        const t = S.templates.find((x) => x.key === ev.target.value);
+        if (t) { loadWorkflow(structuredClone(t.workflow), t.task); toast(`Loaded “${t.name}”: ${t.description}`); }
+      });
+
+      // ───────────────────────────── start-up ─────────────────────────────
+      function renderAll() {
+        renderNodes();
+        renderInspector();
+      }
+      async function init() {
+        try {
+          const [cfg, templates] = await Promise.all([fetch("/api/config").then((r) => r.json()), fetch("/api/templates").then((r) => r.json())]);
+          S.cfg = cfg;
+          S.templates = templates;
+        } catch {
+          $("#inspector").textContent = "Could not reach the server. Start it with: uv run uvicorn app.main:app --port 8000";
+          return;
+        }
+        const def = S.cfg.providers.find((p) => p.key === S.cfg.default_provider);
+        $("#providerChip").textContent = def && def.configured ? `${def.label} · ${def.model}` : S.cfg.config_error || "no provider configured: set LLM_PROVIDER and its key in .env";
+        const configured = S.cfg.providers.filter((p) => p.configured).map((p) => p.label);
+        $("#providerChip").title = configured.length ? `Configured: ${configured.join(", ")}. Each agent can pick its own.` : "Add a key to .env";
+        $("#templateSelect").replaceChildren(h("option", { value: "", text: "Template…" }),
+          ...S.templates.map((t) => h("option", { value: t.key, text: `${t.name} — ${t.pattern}` })));
+        const saved = restore();
+        if (saved && saved.workflow && saved.workflow.nodes) {
+          loadWorkflow(saved.workflow, saved.task || "");
+        } else {
+          const t = S.templates[0];
+          $("#templateSelect").value = t.key;
+          loadWorkflow(structuredClone(t.workflow), t.task);
+        }
+      }
+      window.addEventListener("resize", () => { if (S.cfg) { if (S.fitAuto) fit(); drawEdges(); } });
+
+      // The splitter between the canvas and the console: drag to give either more room
+      (function () {
+        const consoleEl = $("#console"), bar = $("#splitter");
+        try { const h0 = parseInt(localStorage.getItem("multiagent-web:console")); if (h0) consoleEl.style.height = clamp(h0, 140, window.innerHeight - 280) + "px"; } catch {}
+        let startY = 0, startH = 0;
+        bar.addEventListener("pointerdown", (ev) => {
+          startY = ev.clientY; startH = consoleEl.offsetHeight;
+          bar.setPointerCapture(ev.pointerId);
+          ev.preventDefault();
+        });
+        bar.addEventListener("pointermove", (ev) => {
+          if (!bar.hasPointerCapture(ev.pointerId)) return;
+          consoleEl.style.height = clamp(startH + (startY - ev.clientY), 140, window.innerHeight - 280) + "px";
+          if (S.cfg && S.fitAuto) { fit(); drawEdges(); }
+        });
+        bar.addEventListener("pointerup", () => { try { localStorage.setItem("multiagent-web:console", consoleEl.offsetHeight); } catch {} });
+      })();
+      init();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,138 @@
+[
+  {
+    "id": "KB-0042",
+    "title": "VPN error 809 after laptop sleep or network change",
+    "team": "Network Ops",
+    "region": null,
+    "tags": [
+      "vpn",
+      "error 809",
+      "sleep",
+      "windows"
+    ],
+    "body": "Symptom: the VPN client reports error 809 after the laptop wakes from sleep or the user changes network. Cause: a stale IKEv2 security association on the gateway. Steps: 1. Disconnect and remove the VPN profile. 2. Re-import the profile from the self-service portal. 3. Reboot the laptop. 4. Reconnect on a wired or home network. Rollback: re-import the previous profile from the portal history. Escalate to Network Ops if error 809 returns after step 3."
+  },
+  {
+    "id": "KB-0057",
+    "title": "Re-enrol a lost or replaced MFA token",
+    "team": "Service Desk",
+    "region": null,
+    "tags": [
+      "mfa",
+      "token",
+      "authenticator",
+      "phone",
+      "lost"
+    ],
+    "body": "Symptom: the user lost the phone that holds the authenticator app. Steps: 1. Verify identity with a manager call-back, as POL-SEC-012 requires. 2. Revoke the old token in the identity portal. 3. Issue a temporary access pass valid for 4 hours. 4. Ask the user to enrol the new device. Rollback: revoke the temporary access pass. L1 analysts must not revoke tokens for admin accounts; escalate those to an L2 engineer."
+  },
+  {
+    "id": "KB-0063",
+    "title": "Build agent disk usage above 90 percent",
+    "team": "Platform Engineering",
+    "region": null,
+    "tags": [
+      "disk",
+      "build agent",
+      "space",
+      "docker",
+      "jobs failing"
+    ],
+    "body": "Symptom: a build agent reports disk usage above 90 percent and jobs fail with no space left on device. Steps: 1. Find the largest consumers with du on the work directory. 2. Prune container images older than 7 days. 3. Rotate and compress logs. 4. If usage stays above 85 percent, request a volume expansion through a standard change request. Rollback: pruned images are re-pulled from the registry on demand."
+  },
+  {
+    "id": "KB-0071",
+    "title": "Internal DNS zone not resolving in the EU region",
+    "team": "Network Ops",
+    "region": "EU",
+    "tags": [
+      "dns",
+      "resolver",
+      "zone",
+      "resolve",
+      "eu"
+    ],
+    "body": "Symptom: internal names under the corporate zone stop resolving for EU users. Steps: 1. Check resolver health on eu-dns-01 and eu-dns-02. 2. Flush the cache on both resolvers. 3. Fail over clients to the secondary resolver. 4. Confirm resolution from three sites. Rollback: switch clients back to the primary resolver after it passes health checks. A P1 DNS outage pages the Network Ops on-call engineer."
+  },
+  {
+    "id": "KB-0078",
+    "title": "Expired TLS certificate on an internal gateway",
+    "team": "Platform Engineering",
+    "region": null,
+    "tags": [
+      "tls",
+      "certificate",
+      "expired",
+      "gateway",
+      "https"
+    ],
+    "body": "Symptom: browsers warn that the gateway certificate has expired. Steps: 1. Confirm the expiry date with openssl s_client. 2. Request a renewal from the internal certificate authority. 3. Deploy the new certificate in the maintenance window under a standard change request (POL-CHG-004). 4. Verify the chain from two networks. Rollback: reinstall the previous certificate, only if it has not been revoked."
+  },
+  {
+    "id": "KB-0084",
+    "title": "Reset a forgotten password with self-service",
+    "team": "Service Desk",
+    "region": null,
+    "tags": [
+      "password",
+      "reset",
+      "self-service",
+      "forgot"
+    ],
+    "body": "Symptom: the user forgot their password. Steps: 1. Direct the user to the self-service portal. 2. The user confirms identity with their enrolled MFA token. 3. The user sets a new password that meets the policy. Rollback: not applicable. If MFA is also lost, follow KB-0057 instead."
+  },
+  {
+    "id": "KB-0091",
+    "title": "Kubernetes worker node in NotReady state",
+    "team": "Platform Engineering",
+    "region": null,
+    "tags": [
+      "kubernetes",
+      "node",
+      "notready",
+      "pods",
+      "pending"
+    ],
+    "body": "Symptom: a worker node shows NotReady and pods stay pending. Steps: 1. Cordon the node. 2. Drain it with a 120-second grace period. 3. Check the kubelet service and the node disk and memory pressure. 4. If the node does not recover in 10 minutes, replace it from the node pool. Rollback: uncordon the node once it reports Ready."
+  },
+  {
+    "id": "KB-0097",
+    "title": "Database connection pool exhausted on the orders service",
+    "team": "Platform Engineering",
+    "region": null,
+    "tags": [
+      "database",
+      "connection pool",
+      "exhausted",
+      "orders",
+      "timeouts"
+    ],
+    "body": "Symptom: the orders service times out and logs pool exhausted errors. Steps: 1. Check pool metrics for active, idle and waiting connections. 2. Perform a rolling restart of the application pods to release leaked connections. 3. If the pool stays saturated, raise the pool size through a change request approved by a team lead (POL-CHG-004). Rollback: restore the previous pool size from the change record."
+  },
+  {
+    "id": "KB-0103",
+    "title": "Shared printer queue is stuck",
+    "team": "Service Desk",
+    "region": null,
+    "tags": [
+      "printer",
+      "queue",
+      "stuck",
+      "print"
+    ],
+    "body": "Symptom: documents stay in the queue and nothing prints. Steps: 1. Cancel all jobs for the printer on the print server. 2. Restart the spooler service. 3. Send a test page. Rollback: not applicable. Replace the printer driver only if the test page fails."
+  },
+  {
+    "id": "KB-0110",
+    "title": "Grant access to a shared mailbox",
+    "team": "Service Desk",
+    "region": null,
+    "tags": [
+      "mailbox",
+      "shared",
+      "access",
+      "permission"
+    ],
+    "body": "Symptom: a user needs access to a shared mailbox. Steps: 1. Confirm the mailbox owner approves the request, as POL-SEC-012 requires. 2. Add the user with Full Access. 3. Allow up to 60 minutes for the mailbox to appear. Rollback: remove the permission. Finance mailboxes also need the Finance team lead's approval."
+  }
+]
